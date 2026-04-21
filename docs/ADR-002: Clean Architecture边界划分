@@ -1,23 +1,48 @@
-# ADR-002: Clean Architecture 边界划分
+# ADR-002: Go项目Clean Architecture三层解耦与AI协作规范
 
-## Architecture Diagrams
-- Include relevant diagrams here that illustrate the architecture and state the boundaries clearly.
+- **状态**: 已接受
+- **日期**: 2026-03-25
+- **作者**: 季澔辰
+- **相关项目**: OpFlow
 
-## Code Examples
-- Provide code snippets demonstrating proper separation of concerns according to the Clean Architecture principles.
+## 背景
 
-## Practical Guidelines
-- Outline clear, actionable steps for implementing clean architecture in projects.
+OpFlow使用Go+Next.js全栈开发，初期让Claude直接生成代码骨架。第3天出现严重架构问题：
 
-## Verification Checklist
-- List items to verify to ensure that the architecture adheres to the intended boundaries, such as:
-  - Does the project structure reflect the desired boundaries?
-  - Are all dependencies managed according to the principles?
+- `usecase`层直接依赖`domain`层实体，违反依赖倒置原则
+- 包循环导入导致编译失败（`internal/analyzer`依赖`internal/collector`，collector又回调analyzer）
+- AI生成的代码"能跑但不可维护"
 
-## Prompt Template
-- Provide templates or formats for documentation, code reviews, or architecture discussions related to clean architecture principles.
+## 决策
 
-## CI/CD Suggestions
-- Discuss integration strategies for CI/CD that align with Clean Architecture practices.
-  - Suggest using automated tests to enforce architecture checks.
-  - Recommend tooling or frameworks that facilitate smooth CI/CD implementation.
+强制实施Clean Architecture三层结构（Domain→UseCase→Interface），并建立"AI写骨架-人工审架构-协同填血肉"的协作规范。
+
+## 备选方案
+
+| 方案 | 优点 | 缺点 | 结论 |
+|---|---|---|---|
+| 继续让AI自由发挥 | 开发速度极快 | 架构腐烂，2周后无法迭代 | 否 |
+| 严格禁止AI写架构代码 | 架构纯净 | 开发效率下降50%，不符合MVP节奏 | 否 |
+| **分层管控+AI协作规范** | 兼顾速度与架构主权 | 需人工审核环节，每天多花30分钟 | **采纳** |
+
+## 影响
+
+- **正面**: 包循环依赖清零；Domain层零外部依赖，可独立测试；UseCase层可mock替换
+- **负面**: 前期需向AI反复声明边界规则，Prompt长度增加
+- **技术债务**: 当前Interface层混了HTTP Handler和Repository实现，未来需拆分出独立Infrastructure层
+
+## 验证
+
+- 架构图: [OpFlow/docs/arch-v1.png](https://github.com/haoyuehhh/opflow)
+- 关键Commit: `fix: resolve circular import between analyzer and collector`
+- 指标: 代码覆盖率从45%提升至85%，新增功能开发时间从4h降至2h（架构稳定后）
+
+## 协作规范（沉淀为团队级标准）
+
+1. **AI禁区**: Domain实体定义、Repository接口、依赖方向
+2. **AI授权区**: 具体SQL实现、HTTP Handler逻辑、DTO转换
+3. **人工检查点**: 每次AI生成后必须检查import方向，禁止反向依赖
+
+## 相关链接
+
+- 参考: [OpFlow ARCHITECTURE.md](https://github.com/haoyuehhh/opflow/blob/main/docs/ARCHITECTURE.md)
